@@ -14,8 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_PixelRect:
     serializedVersion: 2
-    x: 850
-    y: 31
+    x: 412
+    y: 176
     width: 917
     height: 663
   m_ShowMode: 0
@@ -1402,7 +1402,7 @@ MonoBehaviour:
     m_SkipHidden: 0
     m_SearchArea: 1
     m_Folders:
-    - Assets/Scripts/Dialogue
+    - Assets/Scripts/Interaction
     m_Globs: []
     m_ProductIds: 
     m_AnyWithAssetOrigin: 0
@@ -1412,7 +1412,7 @@ MonoBehaviour:
   m_ViewMode: 1
   m_StartGridSize: 64
   m_LastFolders:
-  - Assets/Scripts/Dialogue
+  - Assets/Scripts/Interaction
   m_LastFoldersGridSize: -1
   m_LastProjectPath: "C:\\Users\\tamni\\OneDrive\\\uBB38\uC11C\\GitHub\\oneroom1\\one
     room1"
@@ -1420,8 +1420,8 @@ MonoBehaviour:
     m_IsLocked: 0
   m_FolderTreeState:
     scrollPos: {x: 0, y: 79}
-    m_SelectedIDs: e67f0000
-    m_LastClickedID: 32742
+    m_SelectedIDs: ee7f0000
+    m_LastClickedID: 32750
     m_ExpandedIDs: 00000000107f0000127f0000147f0000167f0000187f00001a7f00001c7f00001e7f0000207f0000227f0000247f0000267f0000287f0000
     m_RenameOverlay:
       m_UserAcceptedRename: 0
