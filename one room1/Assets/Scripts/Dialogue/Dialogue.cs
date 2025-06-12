@@ -54,7 +54,7 @@ public class Dialogue //monobehavior을 상속받지 않게 지워버렸음
     [Tooltip("스킵라인")]
     public string[] skipnum;
 
-    // 새로 추가: End 열 값 (0 또는 1)
+    // 새로 추가: End 열 값 (0 또는 1) 현재 사용하지 않음
     public int end;
 }
 
