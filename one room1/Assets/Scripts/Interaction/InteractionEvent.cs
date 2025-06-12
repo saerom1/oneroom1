@@ -160,7 +160,7 @@ public class InteractionEvent : MonoBehaviour
             var t = evt.eventTiming;
             bool ok = true;
 
-            // (1) 자동 이벤트 이미 실행된 플래그 있으면 스킵
+            // (1) 자동 이벤트 이미 실행된 플래그 있으면 스킵dd
             if (isAutoEvent
                 && t.eventNum >= 0 && t.eventNum < DatabaseManager.instance.eventFlags.Length
                 && DatabaseManager.instance.eventFlags[t.eventNum])
