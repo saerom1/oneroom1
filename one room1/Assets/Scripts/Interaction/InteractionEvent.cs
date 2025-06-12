@@ -45,7 +45,6 @@ public class InteractionEvent : MonoBehaviour
             SceneManager.sceneLoaded += OnSceneLoaded_Auto;
     }
 
-    // 씬 언로드 또는 오브젝트 파괴 시에도 반드시 콜백 해제
     void OnDisable()
     {
         if (isAutoEvent)
@@ -91,9 +90,34 @@ public class InteractionEvent : MonoBehaviour
         TransferSpawnManager.autoEventTiming = false;
 
         // 4) 실제 자동 이벤트 실행
+        TriggerAutoEvent();
+    }
+
+    /// <summary>
+    /// 대화 종료 직후 즉시 자동 이벤트를 체크하고 실행합니다.
+    /// </summary>
+    public void TryTriggerAutoOnDialogueEnd()
+    {
+        if (!isAutoEvent || _autoExecutedThisScene)
+            return;
+
+        // 씬 로드시와 달리 TransferTiming 체크 제외하고 즉시 실행
+        if (!CheckEvent())
+            return;
+
+        _autoExecutedThisScene = true;
+        TriggerAutoEvent();
+    }
+
+    /// <summary>
+    /// 자동 이벤트 실행 로직을 공통으로 처리합니다.
+    /// </summary>
+    private void TriggerAutoEvent()
+    {
         var dm = FindObjectOfType<DialogueManager>();
         DialogueManager.isWating = true;
 
+        // 등장/퇴장 세팅
         if (GetAppearType() == AppearType.Appear)
             dm.SetAppearObjects(GetTargets());
         else
@@ -102,12 +126,12 @@ public class InteractionEvent : MonoBehaviour
         dm.SetNextEvent(GetNextEvent());
 
         int evtID = dialogueEvent[currentCount].eventTiming.eventNum;
-        Debug.Log($"[InteractionEvent:AutoEventAfterLoad] 자동 이벤트 {evtID} 실행");
+        Debug.Log($"[InteractionEvent:TriggerAutoEvent] 자동 이벤트 {evtID} 실행");
 
         dm.ShowDialogue(GetDialogue());
         GameStateManager.instance.SetEventExecuted(evtID, true);
 
-        // 5) 실행 직후 비활성화 (OnDisable 에서 콜백 해제)
+        // 실행 직후 비활성화 (콜백 해제)
         gameObject.SetActive(false);
     }
 

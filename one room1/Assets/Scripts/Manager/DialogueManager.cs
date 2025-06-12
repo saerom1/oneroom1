@@ -13,28 +13,19 @@ public class DialogueManager : MonoBehaviour
     [SerializeField] TextMeshProUGUI txt_Dialogue;
     [SerializeField] TextMeshProUGUI txt_Name;
 
-
     Dialogue[] dialogues;
-
-    bool isDialogue = false; //지금 대화중인지 아닌지 여부 판별위해 선언
-    bool isNext = false; // 특정 키 입력 대기
+    bool isDialogue = false;
+    bool isNext = false;
 
     [Header("TextDelay")]
     [SerializeField] float textDelay;
 
-    public int lineCount = 0; // 대화 카운트
-    public int contextCount = 0; // 대사 카운트.
+    public int lineCount = 0;
+    public int contextCount = 0;
 
-    // 다음 이벤트를 위한 세팅
     GameObject go_NextEvent;
+    public void SetNextEvent(GameObject p_NextEvent) => go_NextEvent = p_NextEvent;
 
-    public void SetNextEvent(GameObject p_NextEvent)
-    {
-        go_NextEvent = p_NextEvent;
-    }
-
-
-    // 이벤트 끝나면 등장시킬 (혹은 퇴장시킬) 오브젝트들
     GameObject[] go_Objects;
     byte appearTypeNumber;
     const byte NONE = 0, APPEAR = 1, DISAPPEAR = 2;
@@ -45,13 +36,11 @@ public class DialogueManager : MonoBehaviour
         appearTypeNumber = APPEAR;
     }
 
-    public void SetDisappearObjects(GameObject[] p_Targets) 
+    public void SetDisappearObjects(GameObject[] p_Targets)
     {
         go_Objects = p_Targets;
         appearTypeNumber = DISAPPEAR;
     }
-
-
 
     InteractionController theIC;
     CameraController theCam;
@@ -68,136 +57,132 @@ public class DialogueManager : MonoBehaviour
         theSplashManager = FindObjectOfType<SplashManager>();
         theCutSceneManager = FindObjectOfType<CutSceneManager>();
         theSlideManager = FindObjectOfType<SlideManager>();
-
     }
 
     void Update()
     {
-        if (isDialogue) 
-        { 
-            if(isNext) 
-            { 
-                if(Input.GetKeyDown(KeyCode.Space)||Input.GetKeyDown(KeyCode.KeypadEnter)||Input.GetMouseButtonDown(0)) 
-                { 
-                    isNext = false;
-                    txt_Dialogue.text = "";
+        if (!isDialogue || !isNext) return;
+        if (Input.GetKeyDown(KeyCode.Space) ||
+            Input.GetKeyDown(KeyCode.KeypadEnter) ||
+            Input.GetMouseButtonDown(0))
+        {
+            isNext = false;
+            txt_Dialogue.text = "";
 
-                    // 대화 진행 전에 현재 대사에 선택지 이벤트 번호가 있는지 검사
-                    // 예시로, Dialogue.number 배열의 첫 번째 요소를 사용합니다.
-                    if (dialogues[lineCount].number != null &&
-                        dialogues[lineCount].number.Length > 0 &&
-                        !string.IsNullOrEmpty(dialogues[lineCount].number[0]))
-                    {
-                        // 선택지 이벤트로 간주: 이벤트 번호를 정수로 변환
-                        int eventID;
-                        if (int.TryParse(dialogues[lineCount].number[0], out eventID))
-                        {
-                            // ChoiceManager의 선택지 UI 호출 (여기서는 ShowChoicesForEvent 메서드를 사용)
-                            ChoiceManager choiceManager = FindObjectOfType<ChoiceManager>();
-                            if (choiceManager != null)
-                            {
-                                choiceManager.ShowChoicesForEvent(eventID);
-                            }
-                            else
-                            {
-                                Debug.LogError("ChoiceManager를 찾을 수 없습니다.");
-                            }
-                            // 선택지 UI 호출 후 대화 진행을 중단합니다.
-                            return;
-                        }
-                        else
-                        {
-                            Debug.LogWarning("이벤트 번호 파싱에 실패했습니다: " + dialogues[lineCount].number[0]);
-                        }
-                    }
-
-                    // 다음 문장이 동일 행 내에 있으면 문맥 인덱스 증가
-                    if (++contextCount < dialogues[lineCount].contexts.Length) 
-                    {
-                        StartCoroutine(TypeWriter());
-                    }
-                    else
-                    {
-                        contextCount = 0;
-                        // 스킵라인 처리가 필요한 경우 (예: CSV에서 다음 대사 ID 지정)
-                        // 만약 스킵라인 정보가 있다면 그 값으로 JumpToDialogue를 호출할 수도 있음.
-                        if (++lineCount < dialogues.Length)
-                        {
-                            // CameraTargettingType()를 통해 카메라 연출 후 다음 대사를 출력
-                            StartCoroutine(CameraTargettingType());
-                        }
-                        else//대화가 끝난경우
-                        {
-                            StartCoroutine(EndDialogue());
-                        }
-                    }
-                    
+            // 선택지 체크
+            if (dialogues[lineCount].number != null &&
+                dialogues[lineCount].number.Length > 0 &&
+                !string.IsNullOrEmpty(dialogues[lineCount].number[0]))
+            {
+                if (int.TryParse(dialogues[lineCount].number[0], out int eventID))
+                {
+                    var cm = FindObjectOfType<ChoiceManager>();
+                    if (cm != null) cm.ShowChoicesForEvent(eventID);
+                    else Debug.LogError("ChoiceManager를 찾을 수 없습니다.");
+                    return;
                 }
+                else Debug.LogWarning("이벤트 번호 파싱 실패: " + dialogues[lineCount].number[0]);
+            }
+
+            // 같은 행 내 다음 문장
+            if (++contextCount < dialogues[lineCount].contexts.Length)
+            {
+                StartCoroutine(TypeWriter());
+            }
+            else
+            {
+                contextCount = 0;
+                if (++lineCount < dialogues.Length)
+                    StartCoroutine(CameraTargettingType());
+                else
+                    StartCoroutine(EndDialogue());
             }
         }
     }
 
     public void ShowDialogue(Dialogue[] p_dialogues)
     {
-        isDialogue = true; //대화가 시작중이면 시작중이다라고 명시적으로 표현
+        isDialogue = true;
         txt_Dialogue.text = "";
-        txt_Name.text = "";   //애네들은 뭔가? 혹시모를 글자잔여물을 확실히 처리하기 위해 처음에 이렇게 선언해주는거
+        txt_Name.text = "";
         theIC.SettingUI(false);
         dialogues = p_dialogues;
-
         StartCoroutine(StartDialogue());
     }
 
     IEnumerator StartDialogue()
     {
-        if (isWating)
-            yield return new WaitForSeconds(0.5f);
+        if (isWating) yield return new WaitForSeconds(0.5f);
         isWating = false;
         theCam.CamOriginSetting();
         StartCoroutine(CameraTargettingType());
     }
 
-    IEnumerator CameraTargettingType() //카메라 타입 분류하는거
+    IEnumerator CameraTargettingType()
     {
-        switch(dialogues[lineCount].cameraType)
+        switch (dialogues[lineCount].cameraType)
         {
-            case CameraType.FadeIn: SettingUI(false); SplashManager.isfinished = false; StartCoroutine(theSplashManager.FadeIn(false, true)); yield return new WaitUntil(()=>SplashManager.isfinished); break;
-            case CameraType.FadeOut: SettingUI(false); SplashManager.isfinished = false; StartCoroutine(theSplashManager.FadeOut(false, true)); yield return new WaitUntil(() => SplashManager.isfinished); break;
-            case CameraType.FlashIn: SettingUI(false); SplashManager.isfinished = false; StartCoroutine(theSplashManager.FadeIn(true, true)); yield return new WaitUntil(() => SplashManager.isfinished); break;
-            case CameraType.FlashOut: SettingUI(false); SplashManager.isfinished = false; StartCoroutine(theSplashManager.FadeOut(true, true)); yield return new WaitUntil(() => SplashManager.isfinished); break;
-
-            case CameraType.ObjectFront: theCam.CameraTargetting(dialogues[lineCount].tf_Target); break;
-            case CameraType.Reset: theCam.CameraTargetting(null, 0.05f, true, false); break; //애가 문제 아닐까? 이거 대로면 리셋 넣으면 카메라 리셋 되어야 하는데
-            case CameraType.ShowCutScene: 
-                SettingUI(false); CutSceneManager.isFinished = false;
-                StartCoroutine(theCutSceneManager.CutSceneCoroutine(dialogues[lineCount].spriteName[contextCount], true));
+            case CameraType.FadeIn:
+                SettingUI(false);
+                SplashManager.isfinished = false;
+                StartCoroutine(theSplashManager.FadeIn(false, true));
+                yield return new WaitUntil(() => SplashManager.isfinished);
+                break;
+            case CameraType.FadeOut:
+                SettingUI(false);
+                SplashManager.isfinished = false;
+                StartCoroutine(theSplashManager.FadeOut(false, true));
+                yield return new WaitUntil(() => SplashManager.isfinished);
+                break;
+            case CameraType.FlashIn:
+                SettingUI(false);
+                SplashManager.isfinished = false;
+                StartCoroutine(theSplashManager.FadeIn(true, true));
+                yield return new WaitUntil(() => SplashManager.isfinished);
+                break;
+            case CameraType.FlashOut:
+                SettingUI(false);
+                SplashManager.isfinished = false;
+                StartCoroutine(theSplashManager.FadeOut(true, true));
+                yield return new WaitUntil(() => SplashManager.isfinished);
+                break;
+            case CameraType.ObjectFront:
+                theCam.CameraTargetting(dialogues[lineCount].tf_Target);
+                break;
+            case CameraType.Reset:
+                theCam.CameraTargetting(null, 0.05f, true, false);
+                break;
+            case CameraType.ShowCutScene:
+                SettingUI(false);
+                CutSceneManager.isFinished = false;
+                StartCoroutine(theCutSceneManager.CutSceneCoroutine(
+                    dialogues[lineCount].spriteName[contextCount], true));
                 yield return new WaitUntil(() => CutSceneManager.isFinished);
                 break;
-
             case CameraType.HideCutScene:
-                SettingUI(false); CutSceneManager.isFinished = false;
+                SettingUI(false);
+                CutSceneManager.isFinished = false;
                 StartCoroutine(theCutSceneManager.CutSceneCoroutine(null, false));
                 yield return new WaitUntil(() => CutSceneManager.isFinished);
                 theCam.CameraTargetting(dialogues[lineCount].tf_Target);
                 break;
-
             case CameraType.AppearSlideCG:
                 SlideManager.isFinished = false;
-                StartCoroutine(theSlideManager.AppearSlide(dialogues[lineCount].spriteName[contextCount].Split(new char[] { '/' })[1]));
-                yield return new WaitUntil(()=>SlideManager.isFinished);
+                StartCoroutine(theSlideManager.AppearSlide(
+                    dialogues[lineCount].spriteName[contextCount].Split('/')[1]));
+                yield return new WaitUntil(() => SlideManager.isFinished);
                 theCam.CameraTargetting(dialogues[lineCount].tf_Target);
                 break;
-
             case CameraType.DisappearSlideCG:
                 SlideManager.isFinished = false;
                 StartCoroutine(theSlideManager.DisappearSlide());
                 yield return new WaitUntil(() => SlideManager.isFinished);
                 theCam.CameraTargetting(dialogues[lineCount].tf_Target);
                 break;
-
             case CameraType.ChangeSlideCG:
                 SlideManager.isChanged = false;
-                StartCoroutine(theSlideManager.ChangeSlide(dialogues[lineCount].spriteName[contextCount].Split(new char[] { '/' })[1]));
+                StartCoroutine(theSlideManager.ChangeSlide(
+                    dialogues[lineCount].spriteName[contextCount].Split('/')[1]));
                 yield return new WaitUntil(() => SlideManager.isChanged);
                 theCam.CameraTargetting(dialogues[lineCount].tf_Target);
                 break;
@@ -209,19 +194,15 @@ public class DialogueManager : MonoBehaviour
     {
         SettingUI(false);
 
-        // 안전한 인덱스 사용: 배열이 비어있지 않다면 마지막 인덱스를 사용
-        if (dialogues != null && dialogues.Length > 0)
-        {
-            int lastIndex = Mathf.Clamp(lineCount, 0, dialogues.Length - 1);
-            if (dialogues[lastIndex].end == 1)
-            {
-                isDialogue = false;
-                yield break;
-            }
-        }
-        else
+        if (dialogues == null || dialogues.Length == 0)
         {
             Debug.LogWarning("대화 배열이 비어있습니다.");
+            yield break;
+        }
+        int lastIndex = Mathf.Clamp(lineCount, 0, dialogues.Length - 1);
+        if (dialogues[lastIndex].end == 1)
+        {
+            isDialogue = false;
             yield break;
         }
 
@@ -233,7 +214,6 @@ public class DialogueManager : MonoBehaviour
         }
 
         AppearOrDisappearObjects();
-
         yield return new WaitUntil(() => Spin2.isFinished);
 
         isDialogue = false;
@@ -253,23 +233,25 @@ public class DialogueManager : MonoBehaviour
         {
             theIC.SettingUI(true);
         }
+
+        // --- 대화 종료 시마다 자동 이벤트 즉시 체크 호출 ---
+        foreach (var ie in FindObjectsOfType<InteractionEvent>())
+            ie.TryTriggerAutoOnDialogueEnd();
     }
 
     void AppearOrDisappearObjects()
     {
-        if(go_Objects != null)
+        if (go_Objects == null) return;
+        Spin2.isFinished = true;
+        foreach (var obj in go_Objects)
         {
-            Spin2.isFinished = true;
-            for(int i = 0; i < go_Objects.Length; i++)
+            if (appearTypeNumber == APPEAR)
             {
-                if (appearTypeNumber == APPEAR)
-                {
-                    go_Objects[i].SetActive(true);
-                    StartCoroutine(go_Objects[i].GetComponent<Spin2>().SetAppearOrDisappear(true));
-                }
-                else if (appearTypeNumber == DISAPPEAR)
-                    StartCoroutine(go_Objects[i].GetComponent<Spin2>().SetAppearOrDisappear(false));
+                obj.SetActive(true);
+                StartCoroutine(obj.GetComponent<Spin2>().SetAppearOrDisappear(true));
             }
+            else
+                StartCoroutine(obj.GetComponent<Spin2>().SetAppearOrDisappear(false));
         }
         go_Objects = null;
         appearTypeNumber = NONE;
@@ -277,42 +259,33 @@ public class DialogueManager : MonoBehaviour
 
     void ChangeSprite()
     {
-        if (dialogues[lineCount].tf_Target != null)
-         
-        {
-            string spriteName = dialogues[lineCount].spriteName[contextCount];
-            Debug.Log($"현재 tf_Target: {dialogues[lineCount].tf_Target.name}");
-            if (dialogues[lineCount].spriteName[contextCount] != "")
-            {
-                StartCoroutine(theSpriteManager.SpriteChangeCoroutine(dialogues[lineCount].tf_Target, dialogues[lineCount].spriteName[contextCount].Split(new char[] { '/' })[0]));
-            }
-        }
-        
+        if (dialogues[lineCount].tf_Target == null) return;
+        string spriteName = dialogues[lineCount].spriteName[contextCount];
+        Debug.Log($"현재 tf_Target: {dialogues[lineCount].tf_Target.name}");
+        if (!string.IsNullOrEmpty(spriteName))
+            StartCoroutine(theSpriteManager.SpriteChangeCoroutine(
+                dialogues[lineCount].tf_Target,
+                spriteName.Split('/')[0]
+            ));
     }
 
     void PlaySound()
     {
-        if (dialogues[lineCount].VoiceName[contextCount] != "")
-        {
-            SoundManager.instance.PlaySound(dialogues[lineCount].VoiceName[contextCount], 2);
-        }
+        string vn = dialogues[lineCount].VoiceName[contextCount];
+        if (!string.IsNullOrEmpty(vn))
+            SoundManager.instance.PlaySound(vn, 2);
     }
-
-        
 
     IEnumerator TypeWriter()
     {
-        // 현재 진행 중인 대화가 없는 경우 종료
         if (dialogues == null || dialogues.Length == 0)
         {
             Debug.LogError("대화 데이터가 비어 있습니다.");
             yield break;
         }
-
-        // 만약 lineCount가 배열 범위를 초과하면 안전하게 종료
         if (lineCount >= dialogues.Length)
         {
-            Debug.LogWarning("lineCount가 배열 범위를 벗어났습니다. 대화를 종료합니다.");
+            Debug.LogWarning("lineCount가 배열 범위를 벗어났습니다.");
             yield break;
         }
 
@@ -320,102 +293,68 @@ public class DialogueManager : MonoBehaviour
         ChangeSprite();
         PlaySound();
 
-        string t_ReplaceText = dialogues[lineCount].contexts[contextCount];
-        t_ReplaceText = t_ReplaceText.Replace("'", ","); //'를 콤마로 변환시켜야지
-        t_ReplaceText = t_ReplaceText.Replace("\\n", "\n");
+        string txt = dialogues[lineCount].contexts[contextCount]
+            .Replace("'", ",")
+            .Replace("\\n", "\n");
 
-
-
-        bool t_white = false, t_yellow = false, t_cyan = false, t_red = false;
-        bool t_ignore = false;
-
-        for(int i = 0; i < t_ReplaceText.Length; i++) 
+        bool white = false, yellow = false, cyan = false, red = false, ignore = false;
+        foreach (char c in txt)
         {
-            switch(t_ReplaceText[i])
+            switch (c)
             {
-                case 'ⓦ' : t_white = true; t_yellow = false; t_cyan = false; t_red = false; t_ignore = true; break;
-                case 'ⓨ': t_white = false; t_yellow = true; t_cyan = false; t_red = false; t_ignore = true; break;
-                case 'ⓒ': t_white = false; t_yellow = false; t_cyan = true; t_red = false; t_ignore = true; break;
-                case 'ⓡ': t_white = false; t_yellow = false; t_cyan = false; t_red = true; t_ignore = true; break;
-                case '①': StartCoroutine(theSplashManager.Splash()); SoundManager.instance.PlaySound("Emotion1", 1); t_ignore = true; break;
-                case '②': StartCoroutine(theSplashManager.Splash()); SoundManager.instance.PlaySound("Emotion2", 1); t_ignore = true; break;
-                case '③': StartCoroutine(theSplashManager.Splash()); SoundManager.instance.PlaySound("Emotion3", 1); t_ignore = true; break;
-                case '④': StartCoroutine(theSplashManager.Splash()); SoundManager.instance.PlaySound("Emotion4", 1); t_ignore = true; break;
-                case '⑤': StartCoroutine(theSplashManager.Splash()); SoundManager.instance.PlaySound("Emotion5", 1); t_ignore = true; break;
+                case 'ⓦ': white = true; yellow = cyan = red = false; ignore = true; break;
+                case 'ⓨ': yellow = true; white = cyan = red = false; ignore = true; break;
+                case 'ⓒ': cyan = true; white = yellow = red = false; ignore = true; break;
+                case 'ⓡ': red = true; white = yellow = cyan = false; ignore = true; break;
+                case '①': StartCoroutine(theSplashManager.Splash()); SoundManager.instance.PlaySound("Emotion1", 1); ignore = true; break;
+                case '②': StartCoroutine(theSplashManager.Splash()); SoundManager.instance.PlaySound("Emotion2", 1); ignore = true; break;
+                case '③': StartCoroutine(theSplashManager.Splash()); SoundManager.instance.PlaySound("Emotion3", 1); ignore = true; break;
+                case '④': StartCoroutine(theSplashManager.Splash()); SoundManager.instance.PlaySound("Emotion4", 1); ignore = true; break;
+                case '⑤': StartCoroutine(theSplashManager.Splash()); SoundManager.instance.PlaySound("Emotion5", 1); ignore = true; break;
             }
 
-            string t_letter = t_ReplaceText[i].ToString();
-
-            if(!t_ignore)
+            if (!ignore)
             {
-               if(t_white)
-                {
-                    t_letter = "<color=#FFFFFF>" + t_letter + "</color>"; //#fffff 16진수 표기법으로 하얀색, html태그임
-                }
-                else if (t_yellow) 
-                {
-                    t_letter = "<color=#FFFF00>" + t_letter + "</color>";
-                }
-                else if (t_cyan)
-                {
-                    t_letter = "<color=#42DEE3>" + t_letter + "</color>";
-                }
-                else if (t_red)
-                {
-                    t_letter = "<color=#FF0000>" + t_letter + "</color>";
-                }
-                txt_Dialogue.text += t_letter;
+                string letter = c.ToString();
+                if (white) letter = $"<color=#FFFFFF>{letter}</color>";
+                if (yellow) letter = $"<color=#FFFF00>{letter}</color>";
+                if (cyan) letter = $"<color=#42DEE3>{letter}</color>";
+                if (red) letter = $"<color=#FF0000>{letter}</color>";
+                txt_Dialogue.text += letter;
             }
-            t_ignore = false;
-            
+            ignore = false;
             yield return new WaitForSeconds(textDelay);
         }
 
         isNext = true;
-        
     }
 
-    void SettingUI(bool p_flag)  //ui활성화 비활성화 해야지
+    void SettingUI(bool flag)
     {
-        go_DialogueBar.SetActive(p_flag); // 셋 액티브 트루되면서 보여짐
-        
-
-        if (p_flag) 
+        go_DialogueBar.SetActive(flag);
+        if (flag && !string.IsNullOrEmpty(dialogues[lineCount].name))
         {
-            if (dialogues[lineCount].name == "")
-            {
-                go_DialogueNameBar.SetActive(false);
-            }
-            else
-            {
-                go_DialogueNameBar.SetActive(true);
-                txt_Name.text = dialogues[lineCount].name;
-            }
+            go_DialogueNameBar.SetActive(true);
+            txt_Name.text = dialogues[lineCount].name;
         }
-        else 
+        else
         {
-            go_DialogueNameBar.SetActive(false) ;
+            go_DialogueNameBar.SetActive(false);
         }
-
-        //go_DialogueNameBar.SetActive(p_flag);
     }
 
-    
-
-    public void JumpToDialogueBlock(int startDialogueID, int endDialogueID)
+    public void JumpToDialogueBlock(int startID, int endID)
     {
-        Dialogue[] newDialogues = DatabaseManager.instance.GetDialogue(startDialogueID, endDialogueID);
-        if (newDialogues == null || newDialogues.Length == 0)
+        var newD = DatabaseManager.instance.GetDialogue(startID, endID);
+        if (newD == null || newD.Length == 0)
         {
-            Debug.LogError("JumpToDialogueBlock: 대화 블록을 찾을 수 없습니다. 시작: " + startDialogueID + ", 끝: " + endDialogueID);
+            Debug.LogError($"JumpToDialogueBlock 실패: {startID}~{endID}");
             return;
         }
-        dialogues = newDialogues;
-        lineCount = 0;
-        contextCount = 0;
-        Debug.Log("JumpToDialogueBlock: 대화 블록 전환 시작 번호: " + startDialogueID + ", 끝 번호: " + endDialogueID);
+        dialogues = newD;
+        lineCount = contextCount = 0;
+        Debug.Log($"JumpToDialogueBlock: {startID}→{endID}");
         StopAllCoroutines();
         StartCoroutine(TypeWriter());
     }
-
 }
