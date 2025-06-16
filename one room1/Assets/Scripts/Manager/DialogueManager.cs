@@ -1,7 +1,7 @@
-using System.Collections;
+ï»¿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using TMPro; // TextMeshPro Å¬·¡½º¸¦ °¡Á®¿À±â À§ÇØ ¼±¾ğÇØ¾ßÇÔ
+using TMPro; // TextMeshPro í´ë˜ìŠ¤ë¥¼ ê°€ì ¸ì˜¤ê¸° ìœ„í•´ ì„ ì–¸í•´ì•¼í•¨
 
 public class DialogueManager : MonoBehaviour
 {
@@ -69,7 +69,7 @@ public class DialogueManager : MonoBehaviour
             isNext = false;
             txt_Dialogue.text = "";
 
-            // ¼±ÅÃÁö Ã¼Å©
+            // ì„ íƒì§€ ì²´í¬
             if (dialogues[lineCount].number != null &&
                 dialogues[lineCount].number.Length > 0 &&
                 !string.IsNullOrEmpty(dialogues[lineCount].number[0]))
@@ -78,13 +78,13 @@ public class DialogueManager : MonoBehaviour
                 {
                     var cm = FindObjectOfType<ChoiceManager>();
                     if (cm != null) cm.ShowChoicesForEvent(eventID);
-                    else Debug.LogError("ChoiceManager¸¦ Ã£À» ¼ö ¾ø½À´Ï´Ù.");
+                    else Debug.LogError("ChoiceManagerë¥¼ ì°¾ì„ ìˆ˜ ì—†ìŠµë‹ˆë‹¤.");
                     return;
                 }
-                else Debug.LogWarning("ÀÌº¥Æ® ¹øÈ£ ÆÄ½Ì ½ÇÆĞ: " + dialogues[lineCount].number[0]);
+                else Debug.LogWarning("ì´ë²¤íŠ¸ ë²ˆí˜¸ íŒŒì‹± ì‹¤íŒ¨: " + dialogues[lineCount].number[0]);
             }
 
-            // °°Àº Çà ³» ´ÙÀ½ ¹®Àå
+            // ê°™ì€ í–‰ ë‚´ ë‹¤ìŒ ë¬¸ì¥
             if (++contextCount < dialogues[lineCount].contexts.Length)
             {
                 StartCoroutine(TypeWriter());
@@ -193,19 +193,27 @@ public class DialogueManager : MonoBehaviour
     IEnumerator EndDialogue()
     {
         SettingUI(false);
+        // ëŒ€í™” ì¢…ë£Œ ì§í›„â€”ì”¬ ì¬ë¡œë”© ì—†ì´â€”ì¦‰ì‹œ ìë™ ì´ë²¤íŠ¸ë¥¼ ê²€ì‚¬í•˜ê³  ì‹¤í–‰
+        foreach (var ie in FindObjectsOfType<InteractionEvent>())
+            ie.TryTriggerAutoOnDialogueEnd();
 
-        if (dialogues == null || dialogues.Length == 0)
+        // CSVì˜ end í”Œë˜ê·¸ê°€ 1ì´ë©´ ì—¬ê¸°ì„œ ê³§ì¥ ì¢…ë£Œ
+        if (dialogues != null && dialogues.Length > 0)
         {
-            Debug.LogWarning("´ëÈ­ ¹è¿­ÀÌ ºñ¾îÀÖ½À´Ï´Ù.");
+            int lastIndex = Mathf.Clamp(lineCount, 0, dialogues.Length - 1);
+            if (dialogues[lastIndex].end == 1)
+            {
+                isDialogue = false;
+                yield break;
+            }
+        }
+        else
+        {
+            Debug.LogWarning("ëŒ€í™” ë°°ì—´ì´ ë¹„ì–´ìˆìŠµë‹ˆë‹¤.");
             yield break;
         }
-        int lastIndex = Mathf.Clamp(lineCount, 0, dialogues.Length - 1);
-        if (dialogues[lastIndex].end == 1)
-        {
-            isDialogue = false;
-            yield break;
-        }
 
+        // ê¸°ì¡´ EndDialogue ë¡œì§ (ì»·ì”¬Â·ë“±ì¥Â·í‡´ì¥ ì²˜ë¦¬ ë“±)
         if (theCutSceneManager.CheckCutScene())
         {
             CutSceneManager.isFinished = false;
@@ -213,7 +221,21 @@ public class DialogueManager : MonoBehaviour
             yield return new WaitUntil(() => CutSceneManager.isFinished);
         }
 
-        AppearOrDisappearObjects();
+        if (go_Objects != null)
+        {
+            Spin2.isFinished = true;
+            foreach (var obj in go_Objects)
+            {
+                if (appearTypeNumber == APPEAR)
+                {
+                    obj.SetActive(true);
+                    StartCoroutine(obj.GetComponent<Spin2>().SetAppearOrDisappear(true));
+                }
+                else
+                    StartCoroutine(obj.GetComponent<Spin2>().SetAppearOrDisappear(false));
+            }
+        }
+
         yield return new WaitUntil(() => Spin2.isFinished);
 
         isDialogue = false;
@@ -233,10 +255,6 @@ public class DialogueManager : MonoBehaviour
         {
             theIC.SettingUI(true);
         }
-
-        // --- ´ëÈ­ Á¾·á ½Ã¸¶´Ù ÀÚµ¿ ÀÌº¥Æ® Áï½Ã Ã¼Å© È£Ãâ ---
-        foreach (var ie in FindObjectsOfType<InteractionEvent>())
-            ie.TryTriggerAutoOnDialogueEnd();
     }
 
     void AppearOrDisappearObjects()
@@ -261,7 +279,7 @@ public class DialogueManager : MonoBehaviour
     {
         if (dialogues[lineCount].tf_Target == null) return;
         string spriteName = dialogues[lineCount].spriteName[contextCount];
-        Debug.Log($"ÇöÀç tf_Target: {dialogues[lineCount].tf_Target.name}");
+        Debug.Log($"í˜„ì¬ tf_Target: {dialogues[lineCount].tf_Target.name}");
         if (!string.IsNullOrEmpty(spriteName))
             StartCoroutine(theSpriteManager.SpriteChangeCoroutine(
                 dialogues[lineCount].tf_Target,
@@ -280,12 +298,12 @@ public class DialogueManager : MonoBehaviour
     {
         if (dialogues == null || dialogues.Length == 0)
         {
-            Debug.LogError("´ëÈ­ µ¥ÀÌÅÍ°¡ ºñ¾î ÀÖ½À´Ï´Ù.");
+            Debug.LogError("ëŒ€í™” ë°ì´í„°ê°€ ë¹„ì–´ ìˆìŠµë‹ˆë‹¤.");
             yield break;
         }
         if (lineCount >= dialogues.Length)
         {
-            Debug.LogWarning("lineCount°¡ ¹è¿­ ¹üÀ§¸¦ ¹ş¾î³µ½À´Ï´Ù.");
+            Debug.LogWarning("lineCountê°€ ë°°ì—´ ë²”ìœ„ë¥¼ ë²—ì–´ë‚¬ìŠµë‹ˆë‹¤.");
             yield break;
         }
 
@@ -302,15 +320,15 @@ public class DialogueManager : MonoBehaviour
         {
             switch (c)
             {
-                case '¨ã': white = true; yellow = cyan = red = false; ignore = true; break;
-                case '¨å': yellow = true; white = cyan = red = false; ignore = true; break;
-                case '¨Ï': cyan = true; white = yellow = red = false; ignore = true; break;
-                case '¨Ş': red = true; white = yellow = cyan = false; ignore = true; break;
-                case '¨ç': StartCoroutine(theSplashManager.Splash()); SoundManager.instance.PlaySound("Emotion1", 1); ignore = true; break;
-                case '¨è': StartCoroutine(theSplashManager.Splash()); SoundManager.instance.PlaySound("Emotion2", 1); ignore = true; break;
-                case '¨é': StartCoroutine(theSplashManager.Splash()); SoundManager.instance.PlaySound("Emotion3", 1); ignore = true; break;
-                case '¨ê': StartCoroutine(theSplashManager.Splash()); SoundManager.instance.PlaySound("Emotion4", 1); ignore = true; break;
-                case '¨ë': StartCoroutine(theSplashManager.Splash()); SoundManager.instance.PlaySound("Emotion5", 1); ignore = true; break;
+                case 'â“¦': white = true; yellow = cyan = red = false; ignore = true; break;
+                case 'â“¨': yellow = true; white = cyan = red = false; ignore = true; break;
+                case 'â“’': cyan = true; white = yellow = red = false; ignore = true; break;
+                case 'â“¡': red = true; white = yellow = cyan = false; ignore = true; break;
+                case 'â‘ ': StartCoroutine(theSplashManager.Splash()); SoundManager.instance.PlaySound("Emotion1", 1); ignore = true; break;
+                case 'â‘¡': StartCoroutine(theSplashManager.Splash()); SoundManager.instance.PlaySound("Emotion2", 1); ignore = true; break;
+                case 'â‘¢': StartCoroutine(theSplashManager.Splash()); SoundManager.instance.PlaySound("Emotion3", 1); ignore = true; break;
+                case 'â‘£': StartCoroutine(theSplashManager.Splash()); SoundManager.instance.PlaySound("Emotion4", 1); ignore = true; break;
+                case 'â‘¤': StartCoroutine(theSplashManager.Splash()); SoundManager.instance.PlaySound("Emotion5", 1); ignore = true; break;
             }
 
             if (!ignore)
@@ -348,12 +366,12 @@ public class DialogueManager : MonoBehaviour
         var newD = DatabaseManager.instance.GetDialogue(startID, endID);
         if (newD == null || newD.Length == 0)
         {
-            Debug.LogError($"JumpToDialogueBlock ½ÇÆĞ: {startID}~{endID}");
+            Debug.LogError($"JumpToDialogueBlock ì‹¤íŒ¨: {startID}~{endID}");
             return;
         }
         dialogues = newD;
         lineCount = contextCount = 0;
-        Debug.Log($"JumpToDialogueBlock: {startID}¡æ{endID}");
+        Debug.Log($"JumpToDialogueBlock: {startID}â†’{endID}");
         StopAllCoroutines();
         StartCoroutine(TypeWriter());
     }

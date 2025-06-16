@@ -94,18 +94,21 @@ public class InteractionEvent : MonoBehaviour
     }
 
     /// <summary>
-    /// 대화 종료 직후 즉시 자동 이벤트를 체크하고 실행합니다.
+    /// 대화가 끝날 때마다 즉시 자동 이벤트 실행 조건을 체크하고, 실행할 수 있으면 실행합니다.
     /// </summary>
     public void TryTriggerAutoOnDialogueEnd()
     {
+        // 이미 실행되었거나 자동 이벤트가 아니면 무시
         if (!isAutoEvent || _autoExecutedThisScene)
             return;
 
-        // 씬 로드시와 달리 TransferTiming 체크 제외하고 즉시 실행
+        // 씬 로드시의 TransferTiming 체크는 생략하고 바로 조건 검사
         if (!CheckEvent())
             return;
 
+        // 중복 실행 방지
         _autoExecutedThisScene = true;
+        // 실제 실행
         TriggerAutoEvent();
     }
 
