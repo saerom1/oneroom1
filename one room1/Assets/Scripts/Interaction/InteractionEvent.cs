@@ -77,7 +77,7 @@ public class InteractionEvent : MonoBehaviour
 
     private IEnumerator AutoEventAfterLoad()
     {
-        // 1) DB 준비와 페이드/이동 완료 대기
+        // 1) DB 준비와 페이드/이동 완료 대기SS
         yield return new WaitUntil(() =>
             DatabaseManager.isFinish && TransferManager.isFinished);
 
