@@ -89,7 +89,7 @@
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\TextMeshSpawner.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\Benchmark02.cs" />
     <Compile Include="Assets\Scripts\GPT\ChoiceManager.cs" />
-    <Compile Include="Assets\Scripts\Effects\QustionEffect.cs" />
+    <Compile Include="Assets\Scripts\Effects\QuestionEffect.cs" />
     <Compile Include="Assets\Scripts\Effects\Disappear.cs" />
     <Compile Include="Assets\Scripts\Manager\SpriteManager.cs" />
     <Compile Include="Assets\TextMesh Pro\Examples &amp; Extras\Scripts\CameraController.cs" />
