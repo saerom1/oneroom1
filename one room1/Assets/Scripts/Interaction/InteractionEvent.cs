@@ -117,6 +117,8 @@ public class InteractionEvent : MonoBehaviour
     /// </summary>
     public void TryTriggerAutoOnDialogueEnd()
     {
+        Debug.Log($"[TryTrigger] {gameObject.name} 진입, isAutoEvent={isAutoEvent}, _autoExecutedThisScene={_autoExecutedThisScene}");
+
         if (!isAutoEvent || _autoExecutedThisScene)
             return;  // 자동 이벤트 아니거나 이미 실행된 경우 무시
 

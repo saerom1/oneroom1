@@ -197,12 +197,17 @@ public class DialogueManager : MonoBehaviour
 
     IEnumerator EndDialogue()
     {
+        Debug.Log("[EndDialogue] 시작");
+
         // UI 닫기
         SettingUI(false);
 
+        Debug.Log("[EndDialogue] 자동 이벤트 검사 직전");
         // ★ 대화 종료 즉시, static 리스트에 남은 모든 InteractionEvent를 검사
         foreach (var ie in InteractionEvent.allEvents)
             ie.TryTriggerAutoOnDialogueEnd();  // 씬 재로딩 없이 바로 자동 이벤트 트리거
+
+        Debug.Log("[EndDialogue] 자동 이벤트 검사 직후");
 
         // CSV 내 end 플래그가 1이면 여기서 바로 종료
         if (dialogues != null && dialogues.Length > 0)
