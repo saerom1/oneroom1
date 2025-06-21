@@ -117,21 +117,25 @@ public class InteractionEvent : MonoBehaviour
     /// </summary>
     public void TryTriggerAutoOnDialogueEnd()
     {
-        // 1) 진입 확인
+        // 1) 진입 여부 로깅
         Debug.Log($"[TryTrigger] {gameObject.name} 진입, isAutoEvent={isAutoEvent}, _autoExecutedThisScene={_autoExecutedThisScene}");
 
-        // 2) 자동 이벤트가 아니거나 이미 실행된 경우 무시
+        // 2) 자동 이벤트가 아니거나 이미 실행된 경우 바로 리턴
         if (!isAutoEvent || _autoExecutedThisScene)
             return;
 
-        // 3) 조건 검사하고, 결과를 로그로 찍기
+        // 3) 조건 검사 결과 로깅
         bool ok = CheckEvent();
         Debug.Log($"[TryTrigger] CheckEvent 결과: {ok}");
+
+        // 4) 검사 실패 시 리턴
         if (!ok)
             return;
 
-        // 4) 중복 실행 방지 플래그 세팅 후 실행
+        // 5) 중복 실행 방지 마킹
         _autoExecutedThisScene = true;
+
+        // 6) 실제 이벤트 실행
         TriggerAutoEvent();
     }
 
