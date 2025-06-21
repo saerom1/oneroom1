@@ -110,7 +110,7 @@ public class InteractionEvent : MonoBehaviour
     }
 
     /// <summary>
-    /// 자동 이벤트 실행 로직을 공통으로 처리합니다.
+    /// 자동 이벤트 실행 로직을 공통으로 처리합니다.ff
     /// </summary>
     private void TriggerAutoEvent()
     {
