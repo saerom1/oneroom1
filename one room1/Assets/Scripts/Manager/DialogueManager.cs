@@ -1,7 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using TMPro; // TextMeshPro 클래스를 가져오기 위해 선언해야함
+using TMPro; // TextMeshPro 사용
 
 public class DialogueManager : MonoBehaviour
 {
@@ -14,34 +14,36 @@ public class DialogueManager : MonoBehaviour
     [SerializeField] TextMeshProUGUI txt_Name;
 
     Dialogue[] dialogues;
-    bool isDialogue = false;
-    bool isNext = false;
+
+    bool isDialogue = false;   // 대화 중인지 여부
+    bool isNext = false;       // 다음 입력 대기 상태
 
     [Header("TextDelay")]
     [SerializeField] float textDelay;
 
-    public int lineCount = 0;
-    public int contextCount = 0;
+    public int lineCount = 0;     // 현재 대화 행 인덱스
+    public int contextCount = 0;  // 행 내 문장 인덱스
 
+    // 대화 종료 후 활성화할 다음 이벤트
     GameObject go_NextEvent;
     public void SetNextEvent(GameObject p_NextEvent) => go_NextEvent = p_NextEvent;
 
+    // 대화 종료 시 등장/퇴장할 오브젝트들
     GameObject[] go_Objects;
     byte appearTypeNumber;
     const byte NONE = 0, APPEAR = 1, DISAPPEAR = 2;
-
     public void SetAppearObjects(GameObject[] p_Targets)
     {
         go_Objects = p_Targets;
         appearTypeNumber = APPEAR;
     }
-
     public void SetDisappearObjects(GameObject[] p_Targets)
     {
         go_Objects = p_Targets;
         appearTypeNumber = DISAPPEAR;
     }
 
+    // 의존 매니저들
     InteractionController theIC;
     CameraController theCam;
     SplashManager theSplashManager;
@@ -62,6 +64,7 @@ public class DialogueManager : MonoBehaviour
     void Update()
     {
         if (!isDialogue || !isNext) return;
+
         if (Input.GetKeyDown(KeyCode.Space) ||
             Input.GetKeyDown(KeyCode.KeypadEnter) ||
             Input.GetMouseButtonDown(0))
@@ -69,7 +72,7 @@ public class DialogueManager : MonoBehaviour
             isNext = false;
             txt_Dialogue.text = "";
 
-            // 선택지 체크
+            // --- 선택지 이벤트 있으면 우선 처리 ---
             if (dialogues[lineCount].number != null &&
                 dialogues[lineCount].number.Length > 0 &&
                 !string.IsNullOrEmpty(dialogues[lineCount].number[0]))
@@ -92,6 +95,7 @@ public class DialogueManager : MonoBehaviour
             else
             {
                 contextCount = 0;
+                // 다음 행
                 if (++lineCount < dialogues.Length)
                     StartCoroutine(CameraTargettingType());
                 else
@@ -112,7 +116,8 @@ public class DialogueManager : MonoBehaviour
 
     IEnumerator StartDialogue()
     {
-        if (isWating) yield return new WaitForSeconds(0.5f);
+        if (isWating)
+            yield return new WaitForSeconds(0.5f);
         isWating = false;
         theCam.CamOriginSetting();
         StartCoroutine(CameraTargettingType());
@@ -192,20 +197,35 @@ public class DialogueManager : MonoBehaviour
 
     IEnumerator EndDialogue()
     {
+        Debug.Log("[EndDialogue] 시작");
+
+        // UI 닫기
         SettingUI(false);
 
-        if (dialogues == null || dialogues.Length == 0)
+        Debug.Log("[EndDialogue] 자동 이벤트 검사 직전");
+        // ★ 대화 종료 즉시, static 리스트에 남은 모든 InteractionEvent를 검사
+        foreach (var ie in InteractionEvent.allEvents)
+            ie.TryTriggerAutoOnDialogueEnd();  // 씬 재로딩 없이 바로 자동 이벤트 트리거
+
+        Debug.Log("[EndDialogue] 자동 이벤트 검사 직후");
+
+        // CSV 내 end 플래그가 1이면 여기서 바로 종료
+        if (dialogues != null && dialogues.Length > 0)
+        {
+            int lastIndex = Mathf.Clamp(lineCount, 0, dialogues.Length - 1);
+            if (dialogues[lastIndex].end == 1)
+            {
+                isDialogue = false;
+                yield break;
+            }
+        }
+        else
         {
             Debug.LogWarning("대화 배열이 비어있습니다.");
             yield break;
         }
-        int lastIndex = Mathf.Clamp(lineCount, 0, dialogues.Length - 1);
-        if (dialogues[lastIndex].end == 1)
-        {
-            isDialogue = false;
-            yield break;
-        }
 
+        // 기존 EndDialogue 로직 (컷씬, 등장/퇴장, 카메라 복원 등)
         if (theCutSceneManager.CheckCutScene())
         {
             CutSceneManager.isFinished = false;
@@ -213,9 +233,24 @@ public class DialogueManager : MonoBehaviour
             yield return new WaitUntil(() => CutSceneManager.isFinished);
         }
 
-        AppearOrDisappearObjects();
+        // 등장/퇴장
+        if (go_Objects != null)
+        {
+            Spin2.isFinished = true;
+            foreach (var obj in go_Objects)
+            {
+                if (appearTypeNumber == APPEAR)
+                {
+                    obj.SetActive(true);
+                    StartCoroutine(obj.GetComponent<Spin2>().SetAppearOrDisappear(true));
+                }
+                else
+                    StartCoroutine(obj.GetComponent<Spin2>().SetAppearOrDisappear(false));
+            }
+        }
         yield return new WaitUntil(() => Spin2.isFinished);
 
+        // 상태 리셋
         isDialogue = false;
         contextCount = 0;
         lineCount = 0;
@@ -224,6 +259,7 @@ public class DialogueManager : MonoBehaviour
         theCam.CameraTargetting(null, 0.05f, true, true);
         yield return new WaitUntil(() => !InteractionController.isInteract);
 
+        // 다음 이벤트 활성화
         if (go_NextEvent != null)
         {
             go_NextEvent.SetActive(true);
@@ -233,28 +269,6 @@ public class DialogueManager : MonoBehaviour
         {
             theIC.SettingUI(true);
         }
-
-        // --- 대화 종료 시마다 자동 이벤트 즉시 체크 호출 ---
-        foreach (var ie in FindObjectsOfType<InteractionEvent>())
-            ie.TryTriggerAutoOnDialogueEnd();
-    }
-
-    void AppearOrDisappearObjects()
-    {
-        if (go_Objects == null) return;
-        Spin2.isFinished = true;
-        foreach (var obj in go_Objects)
-        {
-            if (appearTypeNumber == APPEAR)
-            {
-                obj.SetActive(true);
-                StartCoroutine(obj.GetComponent<Spin2>().SetAppearOrDisappear(true));
-            }
-            else
-                StartCoroutine(obj.GetComponent<Spin2>().SetAppearOrDisappear(false));
-        }
-        go_Objects = null;
-        appearTypeNumber = NONE;
     }
 
     void ChangeSprite()

@@ -1,10 +1,16 @@
 ﻿using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
 [RequireComponent(typeof(DialogueEvent))]
 public class InteractionEvent : MonoBehaviour
 {
+    // --------------------------------------------------
+    // 1) 모든 InteractionEvent 인스턴스를 한 곳에서 관리하기 위한 static 리스트
+    // --------------------------------------------------
+    public static List<InteractionEvent> allEvents { get; private set; } = new List<InteractionEvent>();
+
     [Header("== 자동 이벤트 여부 ==")]
     public bool isAutoEvent = false;
 
@@ -17,16 +23,23 @@ public class InteractionEvent : MonoBehaviour
     // 한 씬에서 자동 이벤트가 이미 실행되었는지 여부 (중복 실행 방지)
     private bool _autoExecutedThisScene = false;
 
+    // --------------------------------------------------
+    // Awake: 모든 인스턴스를 allEvents에 등록, 기존 Awake 로직 수행
+    // --------------------------------------------------
     void Awake()
     {
-        // 1) 이전에 저장된 활성 상태 복원 (자동 이벤트면 무조건 false)
+        // A) static 리스트에 자신 등록 (중복 방지)
+        if (!allEvents.Contains(this))
+            allEvents.Add(this);
+
+        // B) 이전에 저장된 활성 상태 복원 (자동 이벤트면 무조건 false)
         bool saved = GameStateManager.instance?.GetObjectActiveState(gameObject.name) ?? true;
         Debug.Log($"[InteractionEvent:Awake] {gameObject.name} savedState={saved}");
 
-        // 2) 등장/퇴장 조건 검사
+        // C) 등장/퇴장 조건 검사
         bool allowed = CheckEvent();
 
-        // → 자동 이벤트라면, 이미 실행된 건 다시 허용하지 않음
+        // D) 자동 이벤트라면 이미 실행된 건 다시 허용하지 않음
         if (allowed && isAutoEvent)
         {
             int evtID = dialogueEvent[currentCount].eventTiming.eventNum;
@@ -37,55 +50,61 @@ public class InteractionEvent : MonoBehaviour
             }
         }
 
-        // 3) 최종 활성화 여부 결정
+        // E) 최종 활성화 여부 결정
         gameObject.SetActive(saved && allowed);
 
-        // 4) 자동 이벤트라면 씬 로드 콜백 구독
+        // F) 자동 이벤트라면 씬 로드 콜백 구독
         if (isAutoEvent)
             SceneManager.sceneLoaded += OnSceneLoaded_Auto;
     }
 
+    // --------------------------------------------------
+    // OnDisable/OnDestroy: 이벤트 제거 및 콜백 해제
+    // --------------------------------------------------
     void OnDisable()
     {
+        allEvents.Remove(this);
         if (isAutoEvent)
             SceneManager.sceneLoaded -= OnSceneLoaded_Auto;
     }
 
     void OnDestroy()
     {
+        allEvents.Remove(this);
         if (isAutoEvent)
             SceneManager.sceneLoaded -= OnSceneLoaded_Auto;
     }
 
+    // --------------------------------------------------
+    // 도메인 리로드나 새 씬 로드 전 리스트 초기화
+    // --------------------------------------------------
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    static void InitAllEvents() => allEvents.Clear();
+
     /// <summary>
-    /// 씬 로드 직후 한 번만 자동 이벤트 트리거.
-    /// 실제 실행은 코루틴에서 DB·페이드 완료 대기 후 수행.
+    /// 씬 로드 직후 한 번만 자동 이벤트 트리거. 실제 실행은 코루틴에서 DB·페이드 완료 대기 후 수행.
     /// </summary>
     private void OnSceneLoaded_Auto(Scene scene, LoadSceneMode mode)
     {
-        // (A) 이미 실행됐거나 자동 이벤트가 아니면 무시
         if (!isAutoEvent || _autoExecutedThisScene)
-            return;
+            return;  // 자동 이벤트 아니거나 이미 실행된 경우 무시
 
-        // (B) TransferManager.Transfer()에서 넘어온 타이밍이 아닐 경우 무시
         if (!TransferSpawnManager.autoEventTiming)
-            return;
+            return;  // 씬 전환 타이밍이 아닐 때 무시
 
-        // (C) 안전하게 코루틴 시작
-        StartCoroutine(AutoEventAfterLoad());
+        StartCoroutine(AutoEventAfterLoad());  // 코루틴으로 안전하게 실행
     }
 
     private IEnumerator AutoEventAfterLoad()
     {
         // 1) DB 준비와 페이드/이동 완료 대기
-        yield return new WaitUntil(() =>
-            DatabaseManager.isFinish && TransferManager.isFinished);
+        yield return new WaitUntil(() => DatabaseManager.isFinish && TransferManager.isFinished);
 
         // 2) 등장/퇴장 조건 재검사
         if (!CheckEvent())
             yield break;
 
-        // 3) 중복 실행 방지 및 다음 씬 전까지 재트리거 금지
+        // 3) 중복 실행 방지 및 Transfer 타이밍 초기화
         _autoExecutedThisScene = true;
         TransferSpawnManager.autoEventTiming = false;
 
@@ -94,40 +113,53 @@ public class InteractionEvent : MonoBehaviour
     }
 
     /// <summary>
-    /// 대화 종료 직후 즉시 자동 이벤트를 체크하고 실행합니다.
+    /// 대화 종료 시 자동 이벤트 즉시 체크 및 실행
     /// </summary>
     public void TryTriggerAutoOnDialogueEnd()
     {
+        // 1) 진입 여부 로깅
+        Debug.Log($"[TryTrigger] {gameObject.name} 진입, isAutoEvent={isAutoEvent}, _autoExecutedThisScene={_autoExecutedThisScene}");
+
+        // 2) 자동 이벤트가 아니거나 이미 실행된 경우 바로 리턴
         if (!isAutoEvent || _autoExecutedThisScene)
             return;
 
-        // 씬 로드시와 달리 TransferTiming 체크 제외하고 즉시 실행
-        if (!CheckEvent())
+        // 3) 조건 검사 결과 로깅
+        bool ok = CheckEvent();
+        Debug.Log($"[TryTrigger] CheckEvent 결과: {ok}");
+
+        // 4) 검사 실패 시 리턴
+        if (!ok)
             return;
 
+        // 5) 중복 실행 방지 마킹
         _autoExecutedThisScene = true;
+
+        // 6) 실제 이벤트 실행
         TriggerAutoEvent();
     }
 
     /// <summary>
-    /// 자동 이벤트 실행 로직을 공통으로 처리합니다.ff
+    /// 자동 이벤트 실행 로직 (공통)
     /// </summary>
     private void TriggerAutoEvent()
     {
         var dm = FindObjectOfType<DialogueManager>();
         DialogueManager.isWating = true;
 
-        // 등장/퇴장 세팅
+        // 등장/퇴장 대상 설정
         if (GetAppearType() == AppearType.Appear)
             dm.SetAppearObjects(GetTargets());
         else
             dm.SetDisappearObjects(GetTargets());
 
+        // 다음 이벤트 연결
         dm.SetNextEvent(GetNextEvent());
 
         int evtID = dialogueEvent[currentCount].eventTiming.eventNum;
         Debug.Log($"[InteractionEvent:TriggerAutoEvent] 자동 이벤트 {evtID} 실행");
 
+        // 대화 시작 및 플래그 저장
         dm.ShowDialogue(GetDialogue());
         GameStateManager.instance.SetEventExecuted(evtID, true);
 
@@ -136,8 +168,7 @@ public class InteractionEvent : MonoBehaviour
     }
 
     /// <summary>
-    /// 대사 이벤트 배열을 돌며 등장／퇴장 조건 검사.
-    /// 조건 만족 시 currentCount에 인덱스 저장 후 true 반환.
+    /// 대사 이벤트 배열을 돌며 등장/퇴장 조건 검사
     /// </summary>
     private bool CheckEvent()
     {
@@ -156,11 +187,10 @@ public class InteractionEvent : MonoBehaviour
         {
             var evt = dialogueEvent[i];
             if (evt == null || evt.eventTiming == null) continue;
-
             var t = evt.eventTiming;
             bool ok = true;
 
-            // (1) 자동 이벤트 이미 실행된 플래그 있으면 스킵
+            // 이미 실행된 플래그 있으면 스킵
             if (isAutoEvent
                 && t.eventNum >= 0 && t.eventNum < DatabaseManager.instance.eventFlags.Length
                 && DatabaseManager.instance.eventFlags[t.eventNum])
@@ -169,7 +199,7 @@ public class InteractionEvent : MonoBehaviour
             }
             else
             {
-                // (2) 등장 조건 검사
+                // 등장 조건 검사
                 if (t.eventConditions != null)
                 {
                     foreach (int cond in t.eventConditions)
@@ -177,12 +207,11 @@ public class InteractionEvent : MonoBehaviour
                         if (cond < 0 || cond >= DatabaseManager.instance.eventFlags.Length
                             || DatabaseManager.instance.eventFlags[cond] != t.conditionFlag)
                         {
-                            ok = false;
-                            break;
+                            ok = false; break;
                         }
                     }
                 }
-                // (3) 퇴장(종료) 조건 검사
+                // 퇴장(종료) 조건 검사
                 if (ok
                     && t.eventEndNum >= 0 && t.eventEndNum < DatabaseManager.instance.eventFlags.Length
                     && DatabaseManager.instance.eventFlags[t.eventEndNum])
@@ -197,7 +226,6 @@ public class InteractionEvent : MonoBehaviour
                 return true;
             }
         }
-
         return false;
     }
 
