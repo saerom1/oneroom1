@@ -63,7 +63,7 @@ public class InteractionEvent : MonoBehaviour
     // --------------------------------------------------
     void OnDisable()
     {
-        allEvents.Remove(this);
+        // allEvents.Remove(this);
         if (isAutoEvent)
             SceneManager.sceneLoaded -= OnSceneLoaded_Auto;
     }
@@ -71,6 +71,7 @@ public class InteractionEvent : MonoBehaviour
     void OnDestroy()
     {
         allEvents.Remove(this);
+
         if (isAutoEvent)
             SceneManager.sceneLoaded -= OnSceneLoaded_Auto;
     }
@@ -151,23 +152,31 @@ public class InteractionEvent : MonoBehaviour
         var dm = FindObjectOfType<DialogueManager>();
         DialogueManager.isWating = true;
 
-        // 등장/퇴장 대상 설정
+        // 1) 대화 배열 가져오기
+        Dialogue[] dlg = GetDialogue();
+
+        // 2) null 체크
+        if (dlg == null || dlg.Length == 0)
+        {
+            Debug.LogWarning($"[TriggerAutoEvent] 이벤트 {GetEventNumber()} 대화가 없습니다. 스킵합니다.");
+            return;
+        }
+
+        // 3) 등장/퇴장 세팅
         if (GetAppearType() == AppearType.Appear)
             dm.SetAppearObjects(GetTargets());
         else
             dm.SetDisappearObjects(GetTargets());
 
-        // 다음 이벤트 연결
         dm.SetNextEvent(GetNextEvent());
 
         int evtID = dialogueEvent[currentCount].eventTiming.eventNum;
         Debug.Log($"[InteractionEvent:TriggerAutoEvent] 자동 이벤트 {evtID} 실행");
 
-        // 대화 시작 및 플래그 저장
-        dm.ShowDialogue(GetDialogue());
+        // 4) 안전하게 대화 매니저에 넘기기
+        dm.ShowDialogue(dlg);
         GameStateManager.instance.SetEventExecuted(evtID, true);
 
-        // 실행 직후 비활성화 (콜백 해제)
         gameObject.SetActive(false);
     }
 
