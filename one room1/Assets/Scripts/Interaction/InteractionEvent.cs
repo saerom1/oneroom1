@@ -63,7 +63,7 @@ public class InteractionEvent : MonoBehaviour
     // --------------------------------------------------
     void OnDisable()
     {
-        // allEvents.Remove(this);
+         //allEvents.Remove(this);
         if (isAutoEvent)
             SceneManager.sceneLoaded -= OnSceneLoaded_Auto;
     }
@@ -155,7 +155,7 @@ public class InteractionEvent : MonoBehaviour
         // 1) 대화 배열 가져오기
         Dialogue[] dlg = GetDialogue();
 
-        // 2) null 체크
+        // 2) null 또는 빈 배열이면 스킵
         if (dlg == null || dlg.Length == 0)
         {
             Debug.LogWarning($"[TriggerAutoEvent] 이벤트 {GetEventNumber()} 대화가 없습니다. 스킵합니다.");
@@ -173,11 +173,21 @@ public class InteractionEvent : MonoBehaviour
         int evtID = dialogueEvent[currentCount].eventTiming.eventNum;
         Debug.Log($"[InteractionEvent:TriggerAutoEvent] 자동 이벤트 {evtID} 실행");
 
-        // 4) 안전하게 대화 매니저에 넘기기
-        dm.ShowDialogue(dlg);
-        GameStateManager.instance.SetEventExecuted(evtID, true);
-
+        // 4) 한 프레임 지연 후 안전하게 대화 시작
+        dm.StartCoroutine(DelayedShow(dm, dlg, evtID));
         gameObject.SetActive(false);
+    }
+
+    // 한 프레임 늦춰서 DialogueManager.Start() 쪽 초기화가 다 끝난 뒤 호출
+    private IEnumerator DelayedShow(DialogueManager dm, Dialogue[] dlg, int evtID)
+    {
+        yield return null;    // 한 프레임 대기
+
+        // 실제 대화 띄우기
+        dm.ShowDialogue(dlg);
+
+        // 이벤트 실행 플래그 세팅
+        GameStateManager.instance.SetEventExecuted(evtID, true);
     }
 
     /// <summary>
